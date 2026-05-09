@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Генератор QR-кода</title>
+  <style>
+    :root{ --bg:#f7f9fc; --card:#fff; --accent:#0b5fff; --muted:#666 }
+    body{font-family:Inter, Roboto, system-ui, -apple-system, "Segoe UI", Arial; background:var(--bg); margin:0; padding:24px; color:#111}
+    .container{max-width:900px;margin:0 auto}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+    .grid{display:grid;grid-template-columns:1fr 320px;gap:16px}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type="text"], textarea, select, input[type="number"]{width:100%;padding:10px;border:1px solid #e6e9ef;border-radius:8px;font-size:14px}
+    .controls{display:flex;gap:8px;align-items:center}
+    .row{display:flex;gap:8px}
+    button{background:var(--accent);color:#fff;border:0;padding:10px 12px;border-radius:8px;cursor:pointer}
+    button.secondary{background:#eef2ff;color:var(--accent)}
+    .preview{display:flex;flex-direction:column;align-items:center;gap:12px}
+    #qrcode{background:#fff;padding:10px;border-radius:8px}
+    .small{font-size:13px;color:var(--muted)}
+    .options{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .footer{margin-top:14px;font-size:13px;color:var(--muted)}
+    @media (max-width:820px){ .grid{grid-template-columns:1fr} .preview{order:-1} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Генератор QR-кода</h1>
+      <div class="small">Введите текст или ссылку, настройте параметры и нажмите «Сгенерировать».</div>
+    </header>
+
+    <div class="card grid">
+      <div>
+        <div style="margin-bottom:12px">
+          <label for="text">Текст / URL</label>
+          <textarea id="text" rows="3" placeholder="https://example.com"></textarea>
+        </div>
+
+        <div class="options" style="margin-bottom:12px">
+          <div>
+            <label for="size">Размер (px)</label>
+            <input id="size" type="number" min="64" max="2048" value="256">
+          </div>
+          <div>
+            <label for="ec">Уровень исправления ошибок</label>
+            <select id="ec">
+              <option value="L">L (7%)</option>
+              <option value="M" selected>M (15%)</option>
+              <option value="Q">Q (25%)</option>
+              <option value="H">H (30%)</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="fg">Цвет (передний план)</label>
+            <input id="fg" type="color" value="#000000">
+          </div>
+          <div>
+            <label for="bg">Цвет фона</label>
+            <input id="bg" type="color" value="#ffffff">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <button id="generate">Сгенерировать</button>
+          <button id="download" class="secondary">Скачать PNG</button>
+          <button id="copy" class="secondary">Копировать текст</button>
+        </div>
+
+        <div class="footer">Поддерживает кириллицу, ссылки и любые строки. QR-код генерируется локально в браузере.</div>
+      </div>
+
+      <div class="preview">
+        <div class="small">Предпросмотр</div>
+        <div id="qrcode">Здесь будет QR-код</div>
+        <div id="info" class="small"></div>
+      </div>
+    </div>
+
+    <p style="margin-top:12px;color:#555">Простой генератор QR-кодов. Исходный код использует библиотеку qrcode.js (CDN), генерация производится в canvas.</p>
+  </div>
+
+  <!-- QR code library (uses canvas); CDN link -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <script>
+    // Elements
+    const textEl = document.getElementById('text');
+    const sizeEl = document.getElementById('size');
+    const ecEl = document.getElementById('ec');
+    const fgEl = document.getElementById('fg');
+    const bgEl = document.getElementById('bg');
+    const generateBtn = document.getElementById('generate');
+    const downloadBtn = document.getElementById('download');
+    const copyBtn = document.getElementById('copy');
+    const qrcodeWrap = document.getElementById('qrcode');
+    const info = document.getElementById('info');
+
+    let lastCanvas = null;
+
+    function render() {
+      const value = textEl.value.trim();
+      if (!value) {
+        qrcodeWrap.innerHTML = '<div class="small" style="padding:22px;color:#777">Введите текст или URL для генерации.</div>';
+        info.textContent = '';
+        lastCanvas = null;
+        return;
+      }
+
+      const options = {
+        errorCorrectionLevel: ecEl.value,
+        width: parseInt(sizeEl.value,10) || 256,
+        color: {
+          dark: fgEl.value,
+          light: bgEl.value
+        },
+        margin: 1
+      };
+
+      // Clear
+      qrcodeWrap.innerHTML = '';
+
+      // Create canvas and render
+      const canvas = document.createElement('canvas');
+      QRCode.toCanvas(canvas, value, options, function (error) {
+        if (error) {
+          qrcodeWrap.innerHTML = '<div class="small" style="padding:10px;color:#a33">Ошибка генерации</div>';
+          info.textContent = 'Ошибка: ' + error;
+          lastCanvas = null;
+          console.error(error);
+          return;
+        }
+        qrcodeWrap.appendChild(canvas);
+        lastCanvas = canvas;
+        info.textContent = `Размер: ${options.width}px — Уровень ошибок: ${options.errorCorrectionLevel}`;
+      });
+    }
+
+    generateBtn.addEventListener('click', render);
+
+    // Live render on Enter or when settings change
+    textEl.addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) render(); });
+    [sizeEl, ecEl, fgEl, bgEl].forEach(el=>el.addEventListener('change', render));
+
+    downloadBtn.addEventListener('click', ()=>{
+      if (!lastCanvas) return alert('Сначала сгенерируйте QR-код.');
+      const link = document.createElement('a');
+      link.href = lastCanvas.toDataURL('image/png');
+      link.download = 'qr-code.png';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    });
+
+    copyBtn.addEventListener('click', async ()=>{
+      const text = textEl.value;
+      if (!text) return alert('Нет текста для копирования.');
+      try {
+        await navigator.clipboard.writeText(text);
+        copyBtn.textContent = 'Скопировано!';
+        setTimeout(()=>copyBtn.textContent = 'Копировать текст',1200);
+      } catch (err) {
+        alert('Не удалось скопировать: ' + err);
+      }
+    });
+
+    // Initial placeholder
+    render();
+  </script>
+</body>
+</html>
